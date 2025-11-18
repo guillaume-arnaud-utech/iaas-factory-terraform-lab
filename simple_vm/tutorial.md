@@ -59,7 +59,7 @@ terraform apply
 
 ## Connexion à l'instance GCE
 
-Une fois le déploiement terminé, vous pouvez accéder à votre instance GCE via la commande :
+Une fois le déploiement terminé, vous pouvez accéder à votre instance GCE après avoir récupéré le nom de votre instance depuis la console GCP via la commande :
 
 ```bash
 gcloud compute ssh 'nom de votre instance'
