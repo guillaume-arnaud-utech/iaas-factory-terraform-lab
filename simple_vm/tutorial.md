@@ -6,7 +6,7 @@
 
 ## Description
 
-A l'aide du module TerraformCEINS, vous allez créer une instance GCE simple, prête à l'emploi et conforme aux standards U TECH.
+A l'aide du module Terraform CEINS, vous allez créer une instance GCE simple, prête à l'emploi et conforme aux standards U TECH.
 
 > **Avant de commencer, assurez-vous d'avoir sélectionner le projet GCP à utiliser via le menu déroulant.**
 
