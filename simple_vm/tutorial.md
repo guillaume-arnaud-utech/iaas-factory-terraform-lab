@@ -8,20 +8,23 @@
 
 A l'aide du module CEINS, vous allez créer une instance GCE simple, prête à l'emploi et conforme aux standards U TECH.
 
-> Avant de commencer, veuillez sélectionner le projet GCP à utiliser via le menu déroulant.
+> **Avant de commencer, veuillez sélectionner le projet GCP à utiliser via le menu déroulant.**
 
 ## Création d'un token GitHub
 
-> Cette étape n'est nécessaire que dans le cadre de ce lab.
+> **Cette étape n'est nécessaire que dans le cadre de ce lab.**
 
 Le clone du dépot Git contenant le module CEINS via Terraform nécessite un token GitHub (PAT), l'authentification par mot de passe étant désactivée.
 
-Pour créer ce token, rendez-vous sur la page https://github.com/settings/personal-access-tokens/new
+Pour créer ce token, rendez-vous sur la page :
+
+[https://github.com/settings/tokens/new](https://github.com/settings/tokens/new)
 
 Les informations suivantes vous seront demandées :
 
-Token name : `iaas-factory-terraform-lab`
-Repository access : `All repositories`
+> **Token name** : `iaas-factory-terraform-lab`
+
+> **Select scopes** : `repo`
 
 Veillez à bien noter le token pour la suite de ce lab.
 
@@ -55,7 +58,13 @@ terraform apply
 
 ## Connexion à l'instance GCE
 
-Une fois le déploiement terminé, vous pouvez accéder à votre instance GCE après avoir récupéré le nom de votre instance depuis la console GCP via la commande :
+Une fois le déploiement terminé, vous pouvez accéder à votre instance GCE après avoir récupéré le nom de votre instance via la commande :
+
+```bash
+gcloud compute instances list
+```
+
+Après avoir récupéré le nom de votre instance, vous pouvez vous connecter à cette dernière avec la commande :
 
 ```bash
 gcloud compute ssh 'nom de votre instance'
