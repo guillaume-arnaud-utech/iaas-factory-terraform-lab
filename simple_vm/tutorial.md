@@ -1,6 +1,6 @@
 # Lab - Simple VM
 
-<walkthrough-tutorial-duration duration="30.0"></walkthrough-tutorial-duration>
+<walkthrough-tutorial-duration duration="30"></walkthrough-tutorial-duration>
 
 ## Description
 
