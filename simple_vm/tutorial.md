@@ -33,20 +33,36 @@ Sélectionnez le projet GCP dans lequel vous allez créer votre instance GCE via
 
 Le fichier `main.tf` contient un exemple de code Terraform prête à l'emploi.
 
-Initialisez votre environnement Terraform avec la commande suivante :
+Initialisez votre environnement Terraform avec la commande :
 
 ```bash
 terraform init
 ```
 
-Planifiez votre déploiement avec la commande suivante :
+Planifiez votre déploiement avec la commande :
 
 ```bash
 terraform plan
 ```
 
-Et enfin, déploiez votre instance GCE avec la commande suivante :
+Et enfin, déploiez votre instance GCE avec la commande :
 
 ```bash
 terraform apply
+```
+
+## Connexion à l'instance GCE
+
+Une fois le déploiement terminé, vous pouvez accéder à votre instance GCE via la commande :
+
+```bash
+gcloud compute ssh 'nom de votre instance'
+```
+
+## Nettoyage
+
+Vous pouvez nettoyer votre environnement en supprimant l'instance GCE avec la commande :
+
+```bash
+terraform destroy
 ```
