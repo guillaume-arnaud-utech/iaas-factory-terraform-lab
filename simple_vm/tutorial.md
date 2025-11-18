@@ -1,5 +1,7 @@
 # Lab - Simple VM
 
+<walkthrough-project-id/>
+
 <walkthrough-tutorial-duration duration="30"></walkthrough-tutorial-duration>
 
 ## Description
