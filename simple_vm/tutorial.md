@@ -87,6 +87,8 @@ Vous pouvez nettoyer votre environnement en supprimant l'instance GCE avec la co
 terraform destroy
 ```
 
-## Félicitations !
+## Conclusion
+
+En quelques minutes, vous avez créé une instance GCE et avez pu vous y connecter.
 
 Vous avez terminé ce lab !
