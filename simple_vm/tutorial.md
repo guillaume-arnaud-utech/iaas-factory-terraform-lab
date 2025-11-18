@@ -31,9 +31,15 @@ Sélectionnez le projet GCP dans lequel vous allez créer votre instance GCE via
 
 ## Utilisation du module Terraform CEINS
 
-Le fichier `main.tf` contient un exemple de code Terraform prête à l'emploi.
+Le fichier `main.tf` contient un exemple de code Terraform prête à l'emploi après avoir modifié l'attribut `project_id` pour qu'il corresponde à votre projet GCP.
 
-Initialisez votre environnement Terraform avec la commande :
+Exemple :
+
+```hcl
+project_id = "tec-iaasint-s-ws49"
+```
+
+Ensuite, initialisez votre environnement Terraform avec la commande :
 
 ```bash
 terraform init
