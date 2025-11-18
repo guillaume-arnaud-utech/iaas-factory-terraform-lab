@@ -31,7 +31,7 @@ Sélectionnez le projet GCP dans lequel vous allez créer votre instance GCE via
 
 ## Utilisation du module Terraform CEINS
 
-Le fichier `main.tf` contient un exemple de code Terraform prête à l'emploi après avoir modifié l'attribut `project_id` pour qu'il corresponde à votre projet GCP.
+Le fichier `main.tf` contient un exemple de code Terraform prête à l'emploi après avoir modifié l'attribut `project_id` pour qu'il corresponde au projet GCP précédemment sélectionné.
 
 Exemple :
 
