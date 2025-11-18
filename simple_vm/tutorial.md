@@ -8,7 +8,7 @@
 
 A l'aide du module CEINS, vous allez créer une instance GCE simple, prête à l'emploi et conforme aux standards U TECH.
 
-> **Avant de commencer, veuillez sélectionner le projet GCP à utiliser via le menu déroulant.**
+> **Avant de commencer, assurez-vous d'avoir sélectionner le projet GCP à utiliser via le menu déroulant.**
 
 ## Création d'un token GitHub
 
@@ -27,6 +27,12 @@ Les informations suivantes vous seront demandées :
 > **Select scopes** : `repo`
 
 Veillez à bien noter le token pour la suite de ce lab.
+
+Avant de passer à l'étape suivante, lancer la commande ci-dessous pour mettre en cache le token GitHub afin de ne pas devoir le saisir à chaque utilisation :
+
+```bash
+git config --global credential.helper store
+```
 
 ## Utilisation du module Terraform CEINS
 
