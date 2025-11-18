@@ -28,7 +28,7 @@ Les informations suivantes vous seront demandées :
 
 Veillez à bien noter le token pour la suite de ce lab.
 
-Avant de passer à l'étape suivante, lancer la commande ci-dessous pour mettre en cache le token GitHub afin de ne pas devoir le saisir à chaque utilisation :
+> **Avant de passer à l'étape suivante, lancer la commande ci-dessous pour mettre en cache le token GitHub afin de ne pas devoir le saisir à chaque utilisation :**
 
 ```bash
 git config --global credential.helper store
