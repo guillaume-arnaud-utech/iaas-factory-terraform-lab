@@ -8,4 +8,8 @@ module "simple_vm" {
   description        = "Simple VM"
   instance_profile   = "test"
   os_image_family    = "iaas-rhel-9"
+
+  metadata = {
+    iaas-setup-env = "s"
+  }
 }

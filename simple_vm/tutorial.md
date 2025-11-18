@@ -50,6 +50,8 @@ Ensuite, initialisez votre environnement Terraform avec la commande :
 terraform init
 ```
 
+> Lorsque Terraform vous demande de vous authentifier, utilisez le token GitHub précédemment créé à la place du mot de passe.
+
 Planifiez votre déploiement avec la commande :
 
 ```bash
@@ -64,16 +66,17 @@ terraform apply
 
 ## Connexion à l'instance GCE
 
-Une fois le déploiement terminé, vous pouvez accéder à votre instance GCE après avoir récupéré le nom de votre instance via la commande :
+Une fois le déploiement terminé, vous pouvez accéder à votre instance GCE après avoir récupéré le nom de votre instance via les commandes :
 
 ```bash
+gcloud config set project 'nom du projet GCP sélectionné'
 gcloud compute instances list
 ```
 
 Après avoir récupéré le nom de votre instance, vous pouvez vous connecter à cette dernière avec la commande :
 
 ```bash
-gcloud compute ssh 'nom de votre instance'
+gcloud compute ssh 'nom de votre instance' --zone='zone de l'instance'
 ```
 
 ## Nettoyage
