@@ -50,7 +50,7 @@ Ensuite, initialisez votre environnement Terraform avec la commande :
 terraform init
 ```
 
-> Lorsque Terraform vous demande de vous authentifier, utilisez le token GitHub précédemment créé à la place du mot de passe.
+> **Lorsque Terraform vous demande de vous authentifier, utilisez le token GitHub précédemment créé à la place du mot de passe.**
 
 Planifiez votre déploiement avec la commande :
 
@@ -69,7 +69,7 @@ terraform apply
 Une fois le déploiement terminé, vous pouvez accéder à votre instance GCE après avoir récupéré le nom de votre instance via les commandes :
 
 ```bash
-gcloud config set project 'nom du projet GCP sélectionné'
+gcloud config set project 'id du projet GCP sélectionné'
 gcloud compute instances list
 ```
 
@@ -86,3 +86,7 @@ Vous pouvez nettoyer votre environnement en supprimant l'instance GCE avec la co
 ```bash
 terraform destroy
 ```
+
+## Félicitations !
+
+Vous avez terminé ce lab !
