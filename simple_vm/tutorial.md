@@ -23,9 +23,13 @@ Repository access : `All repositories`
 
 Veillez à bien noter le token pour la suite de ce lab.
 
-## Utilisation du module Terraform CEINS
+## Sélection du projet GCP
+
+> Cette étape n'est nécessaire que dans le cadre de ce lab.
 
 Sélectionnez le projet GCP dans lequel vous allez créer votre instance GCE via le bouton "Select a project" ci-dessus.
+
+## Utilisation du module Terraform CEINS
 
 Le fichier `main.tf` contient un exemple de code Terraform prête à l'emploi.
 
