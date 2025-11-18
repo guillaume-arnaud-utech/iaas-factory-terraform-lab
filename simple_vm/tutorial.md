@@ -91,4 +91,4 @@ terraform destroy
 
 En quelques minutes, vous avez créé une instance GCE et avez pu vous y connecter.
 
-Vous avez terminé ce lab !
+Félicitations, vous avez terminé ce lab !
