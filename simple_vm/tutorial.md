@@ -58,7 +58,7 @@ Planifiez votre déploiement avec la commande :
 terraform plan
 ```
 
-Et enfin, déploiez votre instance GCE avec la commande :
+Et enfin, créez votre instance GCE avec la commande :
 
 ```bash
 terraform apply
