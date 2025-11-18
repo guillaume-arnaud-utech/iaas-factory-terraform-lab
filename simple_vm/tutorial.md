@@ -8,6 +8,8 @@
 
 A l'aide du module CEINS, vous allez créer une instance GCE simple, prête à l'emploi et conforme aux standards U TECH.
 
+> Avant de commencer, veuillez sélectionner le projet GCP à utiliser via le menu déroulant.
+
 ## Création d'un token GitHub
 
 > Cette étape n'est nécessaire que dans le cadre de ce lab.
@@ -22,12 +24,6 @@ Token name : `iaas-factory-terraform-lab`
 Repository access : `All repositories`
 
 Veillez à bien noter le token pour la suite de ce lab.
-
-## Sélection du projet GCP
-
-> Cette étape n'est nécessaire que dans le cadre de ce lab.
-
-Sélectionnez le projet GCP dans lequel vous allez créer votre instance GCE via le bouton "Select a project" ci-dessus.
 
 ## Utilisation du module Terraform CEINS
 
