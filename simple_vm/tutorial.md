@@ -19,11 +19,28 @@ Les informations suivantes vous seront demandées :
 Token name : `iaas-factory-terraform-lab`
 Repository access : `All repositories`
 
-Veillez à bien noter ce token.
+Veillez à bien noter ce token pour la suite.
 
-## Appel du module Terraform CEINS
+## Utilisation du module Terraform CEINS
+
+Selectionnez le projet GCP dans lequel vous allez créer votre instance GCE via le bouton "Select a project" ci-dessus.
 
 Le fichier `main.tf` contient un exemple de code Terraform prête à l'emploi.
 
+Initialisez votre environnement Terraform avec la commande suivante :
 
+```bash
+terraform init
+```
 
+Planifiez votre déploiement avec la commande suivante :
+
+```bash
+terraform plan
+```
+
+Et enfin, déploiez votre instance GCE avec la commande suivante :
+
+```bash
+terraform apply
+```
