@@ -10,6 +10,8 @@ A l'aide du module CEINS, vous allez créer une instance GCE simple, prête à l
 
 ## Création d'un token GitHub
 
+> Cette étape n'est nécessaire que dans le cadre de ce lab.
+
 Le clone du dépot Git contenant le module CEINS via Terraform nécessite un token GitHub (PAT), l'authentification par mot de passe étant désactivée.
 
 Pour créer ce token, rendez-vous sur la page https://github.com/settings/personal-access-tokens/new
