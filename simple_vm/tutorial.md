@@ -13,13 +13,6 @@ A l'aide du module Terraform CEINS, vous allez créer une instance GCE simple, p
 
 <walkthrough-project-setup></walkthrough-project-setup>
 
-Puis définisser votre ID de projet dans une variable d'environnement pour faciliter les prochaines étapes :
-
-```bash
-export PROJECT_ID=$(gcloud config get-value project)
-echo "Projet actuel : $PROJECT_ID"
-```
-
 ## Création d'un token GitHub
 
 > **Cette étape n'est nécessaire que dans le cadre de ce lab.**
@@ -46,28 +39,26 @@ git config --global credential.helper store
 
 ## Utilisation du module Terraform CEINS
 
-Nous allons créer un fichier `main.tf` qui appelle le module pour créer une VM simple.
+Vous allez écrire le code qui appelle le module pour créer une VM simple.
 
-1.  Créez un nouveau répertoire pour votre projet de test et déplacez-vous dedans :
+1.  Créez un nouveau répertoire de travail contenant un fichier `main.tf` :
 
     ```bash
-    mkdir -p ./simple-vm
+    mkdir -p ./simple-vm/main.tf
     cd ./simple-vm
     ```
 
-2.  Créez le fichier `main.tf`.
+2.  Ouvrez le fichier `main.tf`.
 
-    <walkthrough-editor-open-file filePath="./simple-vm/main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
+    <walkthrough-editor-open-file filePath="./main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
 
     Copiez le contenu suivant dans le fichier `main.tf` :
 
     ```hcl
-    variable "project_id" {}
-
     module "simple_vm" {
         source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v21.0.0"
 
-        project_id = var.project_id
+        project_id = "<walkthrough-project-id/>"
 
         instance_base_name = "simplevm"
         instance_type      = "n2-custom-2-4096"
@@ -94,7 +85,7 @@ terraform init
 Vérifiez les ressources qui seront créées. Cette étape permet de valider la configuration avant d'appliquer les changements :
 
 ```bash
-terraform plan -var="project_id=$PROJECT_ID"
+terraform plan
 ```
 
 <walkthrough-spotlight-pointer target="console-output">Vérifiez la sortie pour voir les ressources à créer (Plan: X to add)</walkthrough-spotlight-pointer>
@@ -104,7 +95,7 @@ terraform plan -var="project_id=$PROJECT_ID"
 Lancez la création des ressources après confirmation :
 
 ```bash
-terraform apply -var="project_id=$PROJECT_ID"
+terraform apply
 ```
 
 ## Connexion à l'instance GCE
@@ -112,7 +103,7 @@ terraform apply -var="project_id=$PROJECT_ID"
 Une fois le déploiement terminé, vous pouvez récupérer le nom et la zone de votre instance via les commandes :
 
 ```bash
-gcloud compute instances list --filter="name:simplevm*" --project=$PROJECT_ID
+gcloud compute instances list --filter="name:simplevm*" --project="<walkthrough-project-id/>"
 ```
 
 et vous y connecter avec la commande :
@@ -126,7 +117,7 @@ gcloud compute ssh "nom de votre instance" --zone="zone de l'instance"
 Pour éviter des frais inutiles, supprimez les ressources créées une fois le tutoriel terminé.
 
 ```bash
-terraform destroy -var="project_id=$PROJECT_ID" -auto-approve
+terraform destroy
 ```
 
 ## Conclusion
