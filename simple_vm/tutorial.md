@@ -44,8 +44,9 @@ Vous allez écrire le code qui appelle le module pour créer une VM simple.
 1.  Créez un nouveau répertoire de travail contenant un fichier `main.tf` :
 
     ```bash
-    mkdir -p ./simple-vm/main.tf
+    mkdir -p ./simple-vm
     cd ./simple-vm
+    touch main.tf
     ```
 
 2.  Ouvrez le fichier `main.tf`.
