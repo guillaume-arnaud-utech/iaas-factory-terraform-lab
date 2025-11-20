@@ -51,13 +51,13 @@ Nous allons créer un fichier `main.tf` qui appelle le module pour créer une VM
 1.  Créez un nouveau répertoire pour votre projet de test et déplacez-vous dedans :
 
     ```bash
-    mkdir -p ~/simple-vm
-    cd ~/simple-vm
+    mkdir -p ./simple-vm
+    cd ./simple-vm
     ```
 
 2.  Créez le fichier `main.tf`.
 
-    <walkthrough-editor-open-file filePath="simple-vm/main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
+    <walkthrough-editor-open-file filePath="./main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
 
     Copiez le contenu suivant dans le fichier `main.tf` :
 
