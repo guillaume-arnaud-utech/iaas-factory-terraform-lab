@@ -1,14 +1,26 @@
 # Lab - Simple VM
 
-<walkthrough-project-id/>
-
 <walkthrough-tutorial-duration duration="30"></walkthrough-tutorial-duration>
-
-## Description
 
 A l'aide du module Terraform CEINS, vous allez créer une instance GCE simple, prête à l'emploi et conforme aux standards U TECH.
 
-> **Avant de commencer, assurez-vous d'avoir sélectionner le projet GCP à utiliser via le menu déroulant.**
+## Prérequis
+
+1.  Un projet GCP.
+2.  Les permissions nécessaires pour créer des instances Google Compute Engine.
+
+## Sélection du projet GCP
+
+Veuillez selectionner le projet GCP à utiliser durant ce lab :
+
+<walkthrough-project-setup></walkthrough-project-setup>
+
+Puis définisser votre ID de projet dans une variable d'environnement pour faciliter les prochaines étapes :
+
+```bash
+export PROJECT_ID=$(gcloud config get-value project)
+echo "Projet actuel : $PROJECT_ID"
+```
 
 ## Création d'un token GitHub
 
@@ -36,32 +48,65 @@ git config --global credential.helper store
 
 ## Utilisation du module Terraform CEINS
 
-Le fichier `main.tf` contient un exemple de code Terraform prête à l'emploi après avoir modifié l'attribut `project_id` pour qu'il corresponde au projet GCP précédemment sélectionné.
+Nous allons créer un fichier `main.tf` qui appelle le module pour créer une VM simple.
 
-Exemple :
+1.  Créez un nouveau répertoire pour votre projet de test et déplacez-vous dedans :
 
-```hcl
-project_id = "tec-iaasint-s-ws49"
-```
+    ```bash
+    mkdir -p ~/simple-vm
+    cd ~/simple-vm
+    ```
 
-Ensuite, initialisez votre environnement Terraform avec la commande :
+2.  Créez le fichier `main.tf`.
+
+    <walkthrough-editor-open-file filePath="simple-vm/main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
+
+    Copiez le contenu suivant dans le fichier `main.tf` :
+
+    ```hcl
+    variable "project_id" {}
+
+    module "simple_vm" {
+        source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v21.0.0"
+
+        project_id = var.project_id
+
+        instance_base_name = "simplevm"
+        instance_type      = "n2-custom-2-4096"
+        description        = "Simple VM"
+        instance_profile   = "test"
+        os_image_family    = "iaas-rhel-9"
+
+        metadata = {
+            iaas-setup-env = "s"
+        }
+    }
+    ```
+
+## Initialisation de Terraform
+
+Initialisez Terraform pour télécharger les modules et les providers nécessaires :
 
 ```bash
 terraform init
 ```
 
-> **Lorsque Terraform vous demande de vous authentifier, utilisez le token GitHub précédemment créé à la place du mot de passe.**
+## Planification du déploiement
 
-Planifiez votre déploiement avec la commande :
+Vérifiez les ressources qui seront créées. Cette étape permet de valider la configuration avant d'appliquer les changements :
 
 ```bash
-terraform plan
+terraform plan -var="project_id=$PROJECT_ID"
 ```
 
-Et enfin, créez votre instance GCE avec la commande :
+<walkthrough-spotlight-pointer target="console-output">Vérifiez la sortie pour voir les ressources à créer (Plan: X to add)</walkthrough-spotlight-pointer>
+
+## Création des ressources
+
+Lancez la création des ressources après confirmation :
 
 ```bash
-terraform apply
+terraform apply -var="project_id=$PROJECT_ID"
 ```
 
 ## Connexion à l'instance GCE
@@ -69,26 +114,28 @@ terraform apply
 Une fois le déploiement terminé, vous pouvez récupérer le nom et la zone de votre instance via les commandes :
 
 ```bash
-gcloud config set project 'id du projet GCP sélectionné'
-gcloud compute instances list
+gcloud compute instances list --filter="name:simplevm*" --project=$PROJECT_ID
 ```
 
 et vous y connecter avec la commande :
 
 ```bash
-gcloud compute ssh 'nom de votre instance' --zone='zone de l'instance'
+gcloud compute ssh "nom de votre instance" --zone="zone de l'instance"
 ```
 
 ## Nettoyage
 
-Vous pouvez nettoyer votre environnement en supprimant l'instance GCE avec la commande :
+Pour éviter des frais inutiles, supprimez les ressources créées une fois le tutoriel terminé.
 
 ```bash
-terraform destroy
+terraform destroy -var="project_id=$PROJECT_ID" -auto-approve
 ```
 
 ## Conclusion
 
-En quelques minutes, vous avez créé une instance GCE et avez pu vous y connecter.
+<walkthrough-conclusion-trophy></walkthrough-conclusion-trophy>
 
-Félicitations, vous avez terminé ce lab !
+Félicitations !  En quelques minutes, vous avez créé une instance GCE et avez pu vous y connecter.
+
+Pour aller plus loin :
+*   Consultez la [documentation complète du module](https://github.com/ugieiris/tf-module-gcp-ceins).
