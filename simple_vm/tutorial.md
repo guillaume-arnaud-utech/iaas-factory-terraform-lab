@@ -110,7 +110,7 @@ gcloud compute instances list --filter="name:simplevm*" --project="<walkthrough-
 et vous y connecter avec la commande :
 
 ```bash
-gcloud compute ssh "nom de votre instance" --zone="zone de l'instance"
+gcloud compute ssh "nom de votre instance" --zone="zone de l'instance" --project="<walkthrough-project-id/>"
 ```
 
 ## Nettoyage
