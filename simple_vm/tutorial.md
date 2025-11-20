@@ -11,8 +11,6 @@ A l'aide du module Terraform CEINS, vous allez créer une instance GCE simple, p
 
 ## Sélection du projet GCP
 
-Veuillez selectionner le projet GCP à utiliser durant ce lab :
-
 <walkthrough-project-setup></walkthrough-project-setup>
 
 Puis définisser votre ID de projet dans une variable d'environnement pour faciliter les prochaines étapes :
