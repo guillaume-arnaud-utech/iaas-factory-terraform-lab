@@ -51,7 +51,7 @@ Vous allez écrire le code qui appelle le module pour créer une VM simple.
 
 2.  Ouvrez le fichier `main.tf`.
 
-    <walkthrough-editor-open-file filePath="./main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
+    <walkthrough-editor-open-file filePath="simple-vm/main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
 
     Copiez le contenu suivant dans le fichier `main.tf` :
 
