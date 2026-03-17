@@ -4,44 +4,19 @@
 
 A l'aide du module Terraform CEINS, vous allez créer une instance GCE simple, prête à l'emploi et conforme aux standards U TECH.
 
-## Prérequis
+## Préparation de l'environnement
 
-1.  Un projet GCP.
-2.  Les permissions nécessaires pour créer des instances Google Compute Engine.
+Avant de commencer, il est nécessaire d'éxecuter le script `bootstrap.sh` pour le bon déroulement de ce lab :
 
-## Sélection du projet GCP
-
-<walkthrough-project-setup></walkthrough-project-setup>
-
-## Création d'un token GitHub
-
-> **Cette étape n'est nécessaire que dans le cadre de ce lab.**
-
-Le clone du dépot Git contenant le module CEINS via Terraform nécessite un token GitHub (PAT), l'authentification par mot de passe étant désactivée.
-
-Pour créer ce token, rendez-vous sur la page :
-
-[https://github.com/settings/tokens/new](https://github.com/settings/tokens/new)
-
-Les informations suivantes vous seront demandées :
-
-> **Token name** : `iaas-factory-terraform-lab`
-
-> **Select scopes** : `repo`
-
-Veillez à bien noter le token pour la suite de ce lab.
-
-> **Avant de passer à l'étape suivante, lancer la commande ci-dessous pour mettre en cache le token GitHub afin de ne pas devoir le saisir à chaque utilisation :**
-
-```bash
-git config --global credential.helper store
-```
+    ```bash
+    /bin/bash bootstrap.sh
+    ```
 
 ## Utilisation du module Terraform CEINS
 
 Vous allez écrire le code qui appelle le module pour créer une VM simple.
 
-1.  Créez un nouveau répertoire de travail contenant un fichier `main.tf` :
+1. Créez un nouveau répertoire de travail contenant un fichier `main.tf` :
 
     ```bash
     mkdir -p ./simple-vm
@@ -49,7 +24,7 @@ Vous allez écrire le code qui appelle le module pour créer une VM simple.
     touch main.tf
     ```
 
-2.  Ouvrez le fichier `main.tf`.
+2. Ouvrez le fichier `main.tf`.
 
     <walkthrough-editor-open-file filePath="simple-vm/main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
 
@@ -128,4 +103,5 @@ terraform destroy
 Félicitations !  En quelques minutes, vous avez créé une instance GCE et avez pu vous y connecter.
 
 Pour aller plus loin :
-*   Consultez la [documentation complète du module](https://github.com/ugieiris/tf-module-gcp-ceins).
+
+* Consultez la [documentation complète du module](https://github.com/ugieiris/tf-module-gcp-ceins).
