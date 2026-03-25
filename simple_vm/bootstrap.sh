@@ -1,14 +1,16 @@
 #!/bin/bash
 
+TERRAFORM_VERSION="1.13.2"
+
 mkdir -p ~/.ssh
 
-gcloud secrets versions access latest --secret=github-ssh-key --project=tec-iaasint-s-ws49 > ~/.ssh/terraform-lab
+gcloud secrets versions access latest --secret=github-terraform-lab --project=iaastraining-s-0dwp > ~/.ssh/github-terraform-lab
 
-chmod 600 ~/.ssh/terraform-lab
+chmod 600 ~/.ssh/github-terraform-lab
 
 cat >> ~/.ssh/config <<EOF
 Host github.com
-  IdentityFile ~/.ssh/terraform-lab
+  IdentityFile ~/.ssh/github-terraform-lab
   StrictHostKeyChecking no
 EOF
 
