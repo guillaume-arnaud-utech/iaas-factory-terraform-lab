@@ -8,9 +8,9 @@ A l'aide du module Terraform CEINS, vous allez créer une instance GCE simple, p
 
 Avant de commencer, il est nécessaire d'éxecuter le script `bootstrap.sh` pour le bon déroulement de ce lab :
 
-    ```bash
-    /bin/bash bootstrap.sh
-    ```
+```bash
+/bin/bash bootstrap.sh
+```
 
 ## Utilisation du module Terraform CEINS
 
@@ -18,35 +18,32 @@ Vous allez écrire le code qui appelle le module pour créer une VM simple.
 
 1. Créez un nouveau répertoire de travail contenant un fichier `main.tf` :
 
-    ```bash
-    mkdir -p ./simple-vm
-    cd ./simple-vm
-    touch main.tf
-    ```
+```bash
+mkdir -p ./simple-vm
+cd ./simple-vm
+touch main.tf
+```
 
-2. Ouvrez le fichier `main.tf`.
+1. Ouvrez le fichier `main.tf`.
 
-    <walkthrough-editor-open-file filePath="simple-vm/main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
+<walkthrough-editor-open-file filePath="simple-vm/main.tf">Ouvrir l'éditeur</walkthrough-editor-open-file>
 
-    Copiez le contenu suivant dans le fichier `main.tf` :
+Copiez le contenu suivant dans le fichier `main.tf` :
 
-    ```hcl
-    module "simple_vm" {
-        source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v21.0.0"
-
-        project_id = "<walkthrough-project-id/>"
-
-        instance_base_name = "simplevm"
-        instance_type      = "n2-custom-2-4096"
-        description        = "Simple VM"
-        instance_profile   = "test"
-        os_image_family    = "iaas-rhel-9"
-
-        metadata = {
-            iaas-setup-env = "s"
-        }
+```hcl
+module "simple_vm" {
+    source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v21.0.0"
+    project_id = "<walkthrough-project-id/>"
+    instance_base_name = "simplevm"
+    instance_type      = "n2-custom-2-4096"
+    description        = "Simple VM"
+    instance_profile   = "test"
+    os_image_family    = "iaas-rhel-9"
+    metadata = {
+        iaas-setup-env = "s"
     }
-    ```
+}
+```
 
 ## Initialisation de Terraform
 
