@@ -18,5 +18,5 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 
 curl -fsSL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
   && unzip -q terraform.zip \
-  && sudo mv terraform /usr/local/bin/ \
+  && sudo mv terraform /usr/bin/ \
   && rm terraform.zip LICENSE.txt
