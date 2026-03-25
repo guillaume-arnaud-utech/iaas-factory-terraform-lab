@@ -34,11 +34,11 @@ Copiez le contenu suivant dans le fichier `main.tf` :
 
 ```hcl
 module "simple_vm" {
-    source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v21.0.0"
+    source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v22.4.1"
 
     project_id         = "<walkthrough-project-id/>"
     instance_base_name = "simplevm"
-    instance_type      = "n2-custom-2-4096"
+    instance_type      = "n4-highcpu-2"
     description        = "Simple VM"
     instance_profile   = "test"
     os_image_family    = "iaas-rhel-9"
