@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WRAPPER_MAIN="${SCRIPT_DIR}/main.sh"
+SELF_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+DEFAULT_TERRAFORM_VERSION="${TF_WRAPPER_DEFAULT_TERRAFORM_VERSION:-1.13.2}"
+DEFAULT_VERSIONED_BIN="${HOME}/.local/bin/terraform-${DEFAULT_TERRAFORM_VERSION}"
+
+REAL_TERRAFORM_BIN="${TF_WRAPPER_REAL_TERRAFORM_BIN:-${DEFAULT_VERSIONED_BIN}}"
+
+if [[ ! -x "${REAL_TERRAFORM_BIN}" ]]; then
+  if [[ -x "/usr/bin/terraform" ]]; then
+    REAL_TERRAFORM_BIN="/usr/bin/terraform"
+  elif [[ -x "/google/devshell/bin/terraform" ]]; then
+    REAL_TERRAFORM_BIN="/google/devshell/bin/terraform"
+  else
+    candidate="$(command -v terraform || true)"
+    if [[ -n "${candidate}" && -e "${candidate}" ]]; then
+      candidate_real="$(readlink -f "${candidate}" || true)"
+      if [[ -n "${candidate_real}" && "${candidate_real}" != "${SELF_PATH}" ]]; then
+        REAL_TERRAFORM_BIN="${candidate}"
+      fi
+    fi
+  fi
+fi
+
+if [[ ! -x "${REAL_TERRAFORM_BIN}" ]]; then
+  echo "[tf-wrapper] Binaire Terraform introuvable." >&2
+  echo "[tf-wrapper] Definis TF_WRAPPER_REAL_TERRAFORM_BIN vers le bon chemin." >&2
+  exit 1
+fi
+
+if [[ ! -x "${WRAPPER_MAIN}" ]]; then
+  echo "[tf-wrapper] Wrapper principal introuvable: ${WRAPPER_MAIN}" >&2
+  exit 1
+fi
+
+export TERRAFORM_BIN="${REAL_TERRAFORM_BIN}"
+exec "${WRAPPER_MAIN}" "$@"
