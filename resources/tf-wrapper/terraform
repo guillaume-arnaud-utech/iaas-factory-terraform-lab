@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WRAPPER_MAIN="${SCRIPT_DIR}/main.sh"
 SELF_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${SELF_PATH}")" && pwd)"
+WRAPPER_MAIN="${SCRIPT_DIR}/main.sh"
 DEFAULT_TERRAFORM_VERSION="${TF_WRAPPER_DEFAULT_TERRAFORM_VERSION:-1.13.2}"
 DEFAULT_VERSIONED_BIN="${HOME}/.local/bin/terraform-${DEFAULT_TERRAFORM_VERSION}"
 

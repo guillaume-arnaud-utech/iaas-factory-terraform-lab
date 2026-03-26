@@ -2,7 +2,8 @@
 set -euo pipefail
 
 TERRAFORM_BIN="${TERRAFORM_BIN:-terraform}"
-IMPERSONATE_SA="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-${GOOGLE_IMPERSONATE_SERVICE_ACCOUNT:-}}"
+DEFAULT_IMPERSONATE_SA="sa-tf-app-gcp-iaastraining-s@iaastraining-s-0dwp.iam.gserviceaccount.com"
+IMPERSONATE_SA="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-${DEFAULT_IMPERSONATE_SA}}"
 SKIP_IMPERSONATION_WARMUP="${TF_WRAPPER_SKIP_IMPERSONATION_WARMUP:-}"
 ADC_FILE="${HOME}/.config/gcloud/application_default_credentials.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,15 +13,10 @@ LABELS_FILE_BASENAME="${TF_WRAPPER_LABELS_FILE:-zz-tf-wrapper-labels.tf}"
 LABELS_LOCAL_SYMBOL="${TF_WRAPPER_LABELS_LOCAL_SYMBOL:-local.tf_wrapper_labels}"
 MODULE_SOURCE_CONTAINS="${TF_WRAPPER_MODULE_SOURCE_CONTAINS:-tf-module-gcp-}"
 ENABLE_REMOTE_STATE="${TF_WRAPPER_ENABLE_REMOTE_STATE:-1}"
-STATE_BUCKET="${TF_WRAPPER_GCS_STATE_BUCKET:-}"
-STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE:-terraform-labs}"
+STATE_BUCKET="${TF_WRAPPER_GCS_STATE_BUCKET:-iaastraining-s-bkt-tf_app_gcp_tfstate}"
+STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE:-SANDBOX/users}"
 BACKEND_FILE_BASENAME="${TF_WRAPPER_BACKEND_FILE:-zz-tf-wrapper-backend.tf}"
 LAB_ID="${TF_WRAPPER_LAB_ID:-$(basename "$PWD")}"
-
-if [[ -z "${IMPERSONATE_SA}" ]]; then
-  echo "[tf-wrapper] Variable manquante: TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT (ou GOOGLE_IMPERSONATE_SERVICE_ACCOUNT)." >&2
-  exit 2
-fi
 
 adc_already_impersonated_for_target() {
   [[ -f "${ADC_FILE}" ]] || return 1

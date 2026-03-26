@@ -11,8 +11,10 @@ GITHUB_HOST_ALIAS="${LAB_BOOTSTRAP_GITHUB_HOST_ALIAS:-github.com}"
 TERRAFORM_VERSION="${LAB_BOOTSTRAP_TERRAFORM_VERSION:-1.13.2}"
 TERRAFORM_BIN_DIR="${LAB_BOOTSTRAP_TERRAFORM_BIN_DIR:-${HOME}/.local/bin}"
 TERRAFORM_VERSIONED_BIN="${TERRAFORM_BIN_DIR}/terraform-${TERRAFORM_VERSION}"
-TF_STATE_BUCKET="${LAB_BOOTSTRAP_TF_STATE_BUCKET:-}"
-TF_STATE_PREFIX_BASE="${LAB_BOOTSTRAP_TF_STATE_PREFIX_BASE:-terraform-labs}"
+TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-sa-tf-app-gcp-iaastraining-s@iaastraining-s-0dwp.iam.gserviceaccount.com}"
+TF_WRAPPER_GCS_STATE_BUCKET="${TF_WRAPPER_GCS_STATE_BUCKET:-iaastraining-s-bkt-tf_app_gcp_tfstate}"
+TF_WRAPPER_GCS_STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE:-SANDBOX/users}"
+TF_WRAPPER_ENABLE_REMOTE_STATE="${TF_WRAPPER_ENABLE_REMOTE_STATE:-1}"
 
 ensure_ssh_key() {
   mkdir -p "${HOME}/.ssh"
@@ -64,14 +66,11 @@ ensure_shell_path_defaults() {
   local marker="# iaas-factory-terraform-lab-path"
   local path_line='export PATH="$HOME/.local/bin:$HOME/bin:$PATH"'
   local tf_bin_line="export TF_WRAPPER_REAL_TERRAFORM_BIN=\"\${HOME}/.local/bin/terraform-${TERRAFORM_VERSION}\""
-  local state_bucket_line=""
-  local state_prefix_line="export TF_WRAPPER_GCS_STATE_PREFIX_BASE=\"${TF_STATE_PREFIX_BASE}\""
-  local enable_remote_state_line="export TF_WRAPPER_ENABLE_REMOTE_STATE=\"1\""
+  local impersonate_line="export TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT=\"${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT}\""
+  local state_bucket_line="export TF_WRAPPER_GCS_STATE_BUCKET=\"${TF_WRAPPER_GCS_STATE_BUCKET}\""
+  local state_prefix_line="export TF_WRAPPER_GCS_STATE_PREFIX_BASE=\"${TF_WRAPPER_GCS_STATE_PREFIX_BASE}\""
+  local enable_remote_state_line="export TF_WRAPPER_ENABLE_REMOTE_STATE=\"${TF_WRAPPER_ENABLE_REMOTE_STATE}\""
   local rc_file
-
-  if [[ -n "${TF_STATE_BUCKET}" ]]; then
-    state_bucket_line="export TF_WRAPPER_GCS_STATE_BUCKET=\"${TF_STATE_BUCKET}\""
-  fi
 
   for rc_file in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
     touch "${rc_file}"
@@ -81,12 +80,11 @@ ensure_shell_path_defaults() {
 ${marker}
 ${path_line}
 ${tf_bin_line}
+${impersonate_line}
 ${enable_remote_state_line}
 ${state_prefix_line}
+${state_bucket_line}
 EOF
-      if [[ -n "${state_bucket_line}" ]]; then
-        echo "${state_bucket_line}" >> "${rc_file}"
-      fi
       continue
     fi
 
@@ -96,13 +94,16 @@ EOF
     if ! grep -qF "${tf_bin_line}" "${rc_file}"; then
       echo "${tf_bin_line}" >> "${rc_file}"
     fi
+    if ! grep -qF "${impersonate_line}" "${rc_file}"; then
+      echo "${impersonate_line}" >> "${rc_file}"
+    fi
     if ! grep -qF "${enable_remote_state_line}" "${rc_file}"; then
       echo "${enable_remote_state_line}" >> "${rc_file}"
     fi
     if ! grep -qF "${state_prefix_line}" "${rc_file}"; then
       echo "${state_prefix_line}" >> "${rc_file}"
     fi
-    if [[ -n "${state_bucket_line}" ]] && ! grep -qF "${state_bucket_line}" "${rc_file}"; then
+    if ! grep -qF "${state_bucket_line}" "${rc_file}"; then
       echo "${state_bucket_line}" >> "${rc_file}"
     fi
   done
@@ -153,11 +154,10 @@ main() {
   ensure_terraform_wrapper
   export PATH="${HOME}/.local/bin:${HOME}/bin:${PATH}"
   export TF_WRAPPER_REAL_TERRAFORM_BIN="${TERRAFORM_VERSIONED_BIN}"
-  export TF_WRAPPER_ENABLE_REMOTE_STATE="1"
-  export TF_WRAPPER_GCS_STATE_PREFIX_BASE="${TF_STATE_PREFIX_BASE}"
-  if [[ -n "${TF_STATE_BUCKET}" ]]; then
-    export TF_WRAPPER_GCS_STATE_BUCKET="${TF_STATE_BUCKET}"
-  fi
+  export TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT}"
+  export TF_WRAPPER_ENABLE_REMOTE_STATE="${TF_WRAPPER_ENABLE_REMOTE_STATE}"
+  export TF_WRAPPER_GCS_STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE}"
+  export TF_WRAPPER_GCS_STATE_BUCKET="${TF_WRAPPER_GCS_STATE_BUCKET}"
   echo "[bootstrap] Environnement pret."
 }
 
