@@ -5,7 +5,9 @@ TERRAFORM_BIN="${TERRAFORM_BIN:-terraform}"
 DEFAULT_IMPERSONATE_SA="sa-tf-app-gcp-iaastraining-s@iaastraining-s-0dwp.iam.gserviceaccount.com"
 IMPERSONATE_SA="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-${DEFAULT_IMPERSONATE_SA}}"
 SKIP_IMPERSONATION_WARMUP="${TF_WRAPPER_SKIP_IMPERSONATION_WARMUP:-}"
+ADC_FILE="${HOME}/.config/gcloud/application_default_credentials.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STATE_DIR="${TF_WRAPPER_STATE_DIR:-${HOME}/.tf-wrapper}"
 ENABLE_LABEL_INJECTION="${TF_WRAPPER_ENABLE_LABEL_INJECTION:-1}"
 LABEL_KEY="${TF_WRAPPER_LABEL_KEY:-iaas-training-user}"
 LABELS_FILE_BASENAME="${TF_WRAPPER_LABELS_FILE:-zz-tf-wrapper-labels.tf}"
@@ -19,10 +21,31 @@ STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE:-SANDBOX/users}"
 BACKEND_FILE_BASENAME="${TF_WRAPPER_BACKEND_FILE:-zz-tf-wrapper-backend.tf}"
 LAB_ID="${TF_WRAPPER_LAB_ID:-$(basename "$PWD")}"
 
-impersonation_token_ok() {
-  gcloud auth application-default print-access-token \
-    --impersonate-service-account="${IMPERSONATE_SA}" \
-    >/dev/null 2>&1
+sanitize_sa_for_filename() {
+  local value="$1"
+  value="$(echo -n "${value}" | tr '[:upper:]' '[:lower:]')"
+  value="$(echo -n "${value}" | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')"
+  if [[ -z "${value}" ]]; then
+    value="unknown-sa"
+  fi
+  echo "${value}"
+}
+
+impersonation_state_file() {
+  local sa_file
+  sa_file="$(sanitize_sa_for_filename "${IMPERSONATE_SA}")"
+  mkdir -p "${STATE_DIR}"
+  echo "${STATE_DIR}/adc-impersonation-${sa_file}.ok"
+}
+
+adc_impersonation_configured_for_target() {
+  [[ -f "${ADC_FILE}" ]] || return 1
+  grep -q '"service_account_impersonation_url"' "${ADC_FILE}" || return 1
+  grep -q "${IMPERSONATE_SA}" "${ADC_FILE}" || return 1
+}
+
+adc_token_ok() {
+  gcloud auth application-default print-access-token >/dev/null 2>&1
 }
 
 sanitize_label_value() {
@@ -179,6 +202,8 @@ EOF
 }
 
 check_impersonation() {
+  local warm_file
+
   if [[ -n "${SKIP_IMPERSONATION_WARMUP}" ]]; then
     return 0
   fi
@@ -188,16 +213,25 @@ check_impersonation() {
     exit 3
   fi
 
-  if ! impersonation_token_ok; then
+  warm_file="$(impersonation_state_file)"
+
+  # Fast path: already warmed for this SA and ADC still valid.
+  if [[ -f "${warm_file}" ]] && adc_impersonation_configured_for_target && adc_token_ok; then
+    return 0
+  fi
+
+  if ! adc_impersonation_configured_for_target || ! adc_token_ok; then
     echo "[tf-wrapper] ADC impersonate absent/invalide, ouverture du login navigateur..."
     gcloud auth application-default login \
       --impersonate-service-account="${IMPERSONATE_SA}"
   fi
 
-  if ! impersonation_token_ok; then
+  if ! adc_impersonation_configured_for_target || ! adc_token_ok; then
     echo "[tf-wrapper] ADC invalide apres login pour ${IMPERSONATE_SA}." >&2
     exit 4
   fi
+
+  touch "${warm_file}"
 }
 
 main() {
