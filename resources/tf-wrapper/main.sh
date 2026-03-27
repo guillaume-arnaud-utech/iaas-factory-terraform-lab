@@ -1,25 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TERRAFORM_BIN="${TERRAFORM_BIN:-terraform}"
+STATE_PREFIX_BASE="SANDBOX/users"
 DEFAULT_IMPERSONATE_SA="sa-tf-app-gcp-iaastraining-s@iaastraining-s-0dwp.iam.gserviceaccount.com"
-IMPERSONATE_SA="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-${DEFAULT_IMPERSONATE_SA}}"
-SKIP_IMPERSONATION_WARMUP="${TF_WRAPPER_SKIP_IMPERSONATION_WARMUP:-}"
-ADC_FILE="${HOME}/.config/gcloud/application_default_credentials.json"
+STATE_DIR="${HOME}/.tf-wrapper"
+LABEL_KEY="iaas-training-user"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR="${TF_WRAPPER_STATE_DIR:-${HOME}/.tf-wrapper}"
-ENABLE_LABEL_INJECTION="${TF_WRAPPER_ENABLE_LABEL_INJECTION:-1}"
-LABEL_KEY="${TF_WRAPPER_LABEL_KEY:-iaas-training-user}"
-LABELS_FILE_BASENAME="${TF_WRAPPER_LABELS_FILE:-zz-tf-wrapper-labels.tf}"
-LABELS_LOCAL_SYMBOL="${TF_WRAPPER_LABELS_LOCAL_SYMBOL:-local.tf_wrapper_labels}"
-MODULE_SOURCE_CONTAINS="${TF_WRAPPER_MODULE_SOURCE_CONTAINS:-tf-module-gcp-}"
-ENABLE_INSTANCE_BASE_NAME_FROM_EMAIL="${TF_WRAPPER_SET_INSTANCE_BASE_NAME_FROM_EMAIL:-1}"
-INSTANCE_BASE_NAME_MODULE_SOURCE_CONTAINS="${TF_WRAPPER_INSTANCE_BASE_NAME_MODULE_SOURCE_CONTAINS:-tf-module-gcp-ceins}"
-ENABLE_REMOTE_STATE="${TF_WRAPPER_ENABLE_REMOTE_STATE:-1}"
-STATE_BUCKET="${TF_WRAPPER_GCS_STATE_BUCKET:-iaastraining-s-bkt-tf_app_gcp_tfstate}"
-STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE:-SANDBOX/users}"
-BACKEND_FILE_BASENAME="${TF_WRAPPER_BACKEND_FILE:-zz-tf-wrapper-backend.tf}"
-LAB_ID="${TF_WRAPPER_LAB_ID:-$(basename "$PWD")}"
+
+terraform_bin() {
+  echo "${TERRAFORM_BIN:-terraform}"
+}
+
+run_terraform() {
+  local tf_bin
+  tf_bin="$(terraform_bin)"
+  exec "${tf_bin}" "$@"
+}
+
+has_arg() {
+  local needle="$1"
+  shift
+  local arg
+  for arg in "$@"; do
+    if [[ "${arg}" == "${needle}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
 
 sanitize_sa_for_filename() {
   local value="$1"
@@ -32,20 +41,18 @@ sanitize_sa_for_filename() {
 }
 
 impersonation_state_file() {
+  local impersonate_sa="$1"
   local sa_file
-  sa_file="$(sanitize_sa_for_filename "${IMPERSONATE_SA}")"
+  sa_file="$(sanitize_sa_for_filename "${impersonate_sa}")"
   mkdir -p "${STATE_DIR}"
   echo "${STATE_DIR}/adc-impersonation-${sa_file}.ok"
 }
 
-adc_impersonation_configured_for_target() {
-  [[ -f "${ADC_FILE}" ]] || return 1
-  grep -q '"service_account_impersonation_url"' "${ADC_FILE}" || return 1
-  grep -q "${IMPERSONATE_SA}" "${ADC_FILE}" || return 1
-}
-
-adc_token_ok() {
-  gcloud auth application-default print-access-token >/dev/null 2>&1
+impersonation_token_ok() {
+  local impersonate_sa="$1"
+  gcloud auth application-default print-access-token \
+    --impersonate-service-account="${impersonate_sa}" \
+    >/dev/null 2>&1
 }
 
 sanitize_label_value() {
@@ -79,6 +86,7 @@ discover_user_email() {
 }
 
 build_remote_state_prefix() {
+  local lab_id="$1"
   local user_email
   local user_label
   local lab_label
@@ -89,7 +97,7 @@ build_remote_state_prefix() {
   fi
 
   user_label="$(sanitize_label_value "${user_email}")"
-  lab_label="$(sanitize_label_value "${LAB_ID}")"
+  lab_label="$(sanitize_label_value "${lab_id}")"
   echo "${STATE_PREFIX_BASE}/${user_label}/${lab_label}"
 }
 
@@ -119,8 +127,9 @@ has_backend_block() {
 }
 
 ensure_backend_file_if_needed() {
+  local backend_file_basename="zz-tf-wrapper-backend.tf"
   local backend_file
-  backend_file="${PWD}/${BACKEND_FILE_BASENAME}"
+  backend_file="${PWD}/${backend_file_basename}"
 
   if has_backend_block; then
     return 0
@@ -134,41 +143,29 @@ EOF
 }
 
 run_init_with_remote_state() {
+  local state_bucket="iaastraining-s-bkt-tf_app_gcp_tfstate"
+  local lab_id="$(basename "${PWD}")"
   local state_prefix
 
-  if [[ "${ENABLE_REMOTE_STATE}" == "0" || "${ENABLE_REMOTE_STATE}" == "false" ]]; then
-    exec "${TERRAFORM_BIN}" "$@"
-  fi
-
-  for arg in "$@"; do
-    if [[ "${arg}" == "-backend=false" ]]; then
-      exec "${TERRAFORM_BIN}" "$@"
-    fi
-  done
-
-  if [[ -z "${STATE_BUCKET}" ]]; then
-    echo "[tf-wrapper] Variable manquante: TF_WRAPPER_GCS_STATE_BUCKET." >&2
-    exit 5
+  if has_arg "-backend=false" "$@"; then
+    run_terraform "$@"
   fi
 
   ensure_backend_file_if_needed
-  state_prefix="$(build_remote_state_prefix)"
+  state_prefix="$(build_remote_state_prefix "${lab_id}")"
 
-  exec "${TERRAFORM_BIN}" "$@" \
-    -backend-config="bucket=${STATE_BUCKET}" \
+  run_terraform "$@" \
+    -backend-config="bucket=${state_bucket}" \
     -backend-config="prefix=${state_prefix}"
 }
 
 inject_labels_if_needed() {
   local terraform_subcmd="${1:-}"
+  local labels_file_basename="zz-tf-wrapper-labels.tf"
   local user_email
   local user_label
   local instance_base_name
   local labels_file
-
-  if [[ "${ENABLE_LABEL_INJECTION}" == "0" || "${ENABLE_LABEL_INJECTION}" == "false" ]]; then
-    return 0
-  fi
 
   if ! should_patch_for_command "${terraform_subcmd}"; then
     return 0
@@ -181,7 +178,7 @@ inject_labels_if_needed() {
 
   user_label="$(sanitize_label_value "${user_email}")"
   instance_base_name="$(sanitize_instance_base_name "${user_email%%@*}")"
-  labels_file="${PWD}/${LABELS_FILE_BASENAME}"
+  labels_file="${PWD}/${labels_file_basename}"
 
   cat > "${labels_file}" <<EOF
 locals {
@@ -193,41 +190,38 @@ EOF
 
   python3 "${SCRIPT_DIR}/tf_wrapper_patch_modules.py" \
     --dir "${PWD}" \
-    --exclude "${LABELS_FILE_BASENAME}" \
-    --locals-symbol "${LABELS_LOCAL_SYMBOL}" \
-    --module-source-contains "${MODULE_SOURCE_CONTAINS}" \
-    --set-instance-base-name "${ENABLE_INSTANCE_BASE_NAME_FROM_EMAIL}" \
+    --exclude "${labels_file_basename}" \
+    --locals-symbol "local.tf_wrapper_labels" \
+    --module-source-contains "tf-module-gcp-" \
+    --set-instance-base-name "1" \
     --instance-base-name "${instance_base_name}" \
-    --instance-base-name-module-source-contains "${INSTANCE_BASE_NAME_MODULE_SOURCE_CONTAINS}"
+    --instance-base-name-module-source-contains "tf-module-gcp-ceins"
 }
 
 check_impersonation() {
+  local impersonate_sa="${DEFAULT_IMPERSONATE_SA}"
   local warm_file
-
-  if [[ -n "${SKIP_IMPERSONATION_WARMUP}" ]]; then
-    return 0
-  fi
 
   if ! command -v gcloud >/dev/null 2>&1; then
     echo "[tf-wrapper] gcloud introuvable, verification d'impersonation impossible." >&2
     exit 3
   fi
 
-  warm_file="$(impersonation_state_file)"
+  warm_file="$(impersonation_state_file "${impersonate_sa}")"
 
-  # Fast path: already warmed for this SA and ADC still valid.
-  if [[ -f "${warm_file}" ]] && adc_impersonation_configured_for_target && adc_token_ok; then
+  # Fast path: already warmed for this SA and impersonation still valid.
+  if [[ -f "${warm_file}" ]] && impersonation_token_ok "${impersonate_sa}"; then
     return 0
   fi
 
-  if ! adc_impersonation_configured_for_target || ! adc_token_ok; then
+  if ! impersonation_token_ok "${impersonate_sa}"; then
     echo "[tf-wrapper] ADC impersonate absent/invalide, ouverture du login navigateur..."
     gcloud auth application-default login \
-      --impersonate-service-account="${IMPERSONATE_SA}"
+      --impersonate-service-account="${impersonate_sa}"
   fi
 
-  if ! adc_impersonation_configured_for_target || ! adc_token_ok; then
-    echo "[tf-wrapper] ADC invalide apres login pour ${IMPERSONATE_SA}." >&2
+  if ! impersonation_token_ok "${impersonate_sa}"; then
+    echo "[tf-wrapper] ADC invalide apres login pour ${impersonate_sa}." >&2
     exit 4
   fi
 
@@ -236,12 +230,13 @@ check_impersonation() {
 
 main() {
   local terraform_subcmd="${1:-}"
+
   check_impersonation
   inject_labels_if_needed "${terraform_subcmd}"
   if [[ "${terraform_subcmd}" == "init" ]]; then
     run_init_with_remote_state "$@"
   fi
-  exec "${TERRAFORM_BIN}" "$@"
+  run_terraform "$@"
 }
 
 main "$@"
