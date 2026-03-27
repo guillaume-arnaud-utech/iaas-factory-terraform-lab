@@ -142,6 +142,10 @@ ensure_terraform_wrapper() {
 
   ln -sfn "${WRAPPER_PATH}" "${local_bin}/terraform"
   ln -sfn "${WRAPPER_PATH}" "${user_bin}/terraform"
+  if command -v sudo >/dev/null 2>&1; then
+    # Force wrapper globally to avoid PATH/hash issues in current shell session.
+    sudo ln -sfn "${WRAPPER_PATH}" "/usr/bin/terraform" || true
+  fi
   echo "[bootstrap] Wrapper Terraform installe: ${local_bin}/terraform"
 }
 
@@ -158,6 +162,7 @@ main() {
   export TF_WRAPPER_ENABLE_REMOTE_STATE="${TF_WRAPPER_ENABLE_REMOTE_STATE}"
   export TF_WRAPPER_GCS_STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE}"
   export TF_WRAPPER_GCS_STATE_BUCKET="${TF_WRAPPER_GCS_STATE_BUCKET}"
+  echo "[bootstrap] Si terraform etait deja utilise dans ce shell, execute: hash -r"
   echo "[bootstrap] Environnement pret."
 }
 

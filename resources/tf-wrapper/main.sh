@@ -5,23 +5,24 @@ TERRAFORM_BIN="${TERRAFORM_BIN:-terraform}"
 DEFAULT_IMPERSONATE_SA="sa-tf-app-gcp-iaastraining-s@iaastraining-s-0dwp.iam.gserviceaccount.com"
 IMPERSONATE_SA="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-${DEFAULT_IMPERSONATE_SA}}"
 SKIP_IMPERSONATION_WARMUP="${TF_WRAPPER_SKIP_IMPERSONATION_WARMUP:-}"
-ADC_FILE="${HOME}/.config/gcloud/application_default_credentials.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENABLE_LABEL_INJECTION="${TF_WRAPPER_ENABLE_LABEL_INJECTION:-1}"
 LABEL_KEY="${TF_WRAPPER_LABEL_KEY:-iaas-training-user}"
 LABELS_FILE_BASENAME="${TF_WRAPPER_LABELS_FILE:-zz-tf-wrapper-labels.tf}"
 LABELS_LOCAL_SYMBOL="${TF_WRAPPER_LABELS_LOCAL_SYMBOL:-local.tf_wrapper_labels}"
 MODULE_SOURCE_CONTAINS="${TF_WRAPPER_MODULE_SOURCE_CONTAINS:-tf-module-gcp-}"
+ENABLE_INSTANCE_BASE_NAME_FROM_EMAIL="${TF_WRAPPER_SET_INSTANCE_BASE_NAME_FROM_EMAIL:-1}"
+INSTANCE_BASE_NAME_MODULE_SOURCE_CONTAINS="${TF_WRAPPER_INSTANCE_BASE_NAME_MODULE_SOURCE_CONTAINS:-tf-module-gcp-ceins}"
 ENABLE_REMOTE_STATE="${TF_WRAPPER_ENABLE_REMOTE_STATE:-1}"
 STATE_BUCKET="${TF_WRAPPER_GCS_STATE_BUCKET:-iaastraining-s-bkt-tf_app_gcp_tfstate}"
 STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE:-SANDBOX/users}"
 BACKEND_FILE_BASENAME="${TF_WRAPPER_BACKEND_FILE:-zz-tf-wrapper-backend.tf}"
 LAB_ID="${TF_WRAPPER_LAB_ID:-$(basename "$PWD")}"
 
-adc_already_impersonated_for_target() {
-  [[ -f "${ADC_FILE}" ]] || return 1
-  grep -q '"service_account_impersonation_url"' "${ADC_FILE}" || return 1
-  grep -q "${IMPERSONATE_SA}" "${ADC_FILE}" || return 1
+impersonation_token_ok() {
+  gcloud auth application-default print-access-token \
+    --impersonate-service-account="${IMPERSONATE_SA}" \
+    >/dev/null 2>&1
 }
 
 sanitize_label_value() {
@@ -31,6 +32,17 @@ sanitize_label_value() {
   value="${value:0:63}"
   if [[ -z "${value}" ]]; then
     value="unknown"
+  fi
+  echo "${value}"
+}
+
+sanitize_instance_base_name() {
+  local value="$1"
+  value="$(echo -n "${value}" | tr '[:upper:]' '[:lower:]')"
+  value="$(echo -n "${value}" | sed -E 's/[^a-z0-9]+//g')"
+  value="${value:0:9}"
+  if [[ -z "${value}" ]]; then
+    value="vmuser"
   fi
   echo "${value}"
 }
@@ -55,7 +67,7 @@ build_remote_state_prefix() {
 
   user_label="$(sanitize_label_value "${user_email}")"
   lab_label="$(sanitize_label_value "${LAB_ID}")"
-  echo "${STATE_PREFIX_BASE}/user/${user_label}/lab/${lab_label}"
+  echo "${STATE_PREFIX_BASE}/${user_label}/${lab_label}"
 }
 
 should_patch_for_command() {
@@ -128,6 +140,7 @@ inject_labels_if_needed() {
   local terraform_subcmd="${1:-}"
   local user_email
   local user_label
+  local instance_base_name
   local labels_file
 
   if [[ "${ENABLE_LABEL_INJECTION}" == "0" || "${ENABLE_LABEL_INJECTION}" == "false" ]]; then
@@ -144,6 +157,7 @@ inject_labels_if_needed() {
   fi
 
   user_label="$(sanitize_label_value "${user_email}")"
+  instance_base_name="$(sanitize_instance_base_name "${user_email%%@*}")"
   labels_file="${PWD}/${LABELS_FILE_BASENAME}"
 
   cat > "${labels_file}" <<EOF
@@ -158,7 +172,10 @@ EOF
     --dir "${PWD}" \
     --exclude "${LABELS_FILE_BASENAME}" \
     --locals-symbol "${LABELS_LOCAL_SYMBOL}" \
-    --module-source-contains "${MODULE_SOURCE_CONTAINS}"
+    --module-source-contains "${MODULE_SOURCE_CONTAINS}" \
+    --set-instance-base-name "${ENABLE_INSTANCE_BASE_NAME_FROM_EMAIL}" \
+    --instance-base-name "${instance_base_name}" \
+    --instance-base-name-module-source-contains "${INSTANCE_BASE_NAME_MODULE_SOURCE_CONTAINS}"
 }
 
 check_impersonation() {
@@ -171,13 +188,13 @@ check_impersonation() {
     exit 3
   fi
 
-  if ! adc_already_impersonated_for_target; then
+  if ! impersonation_token_ok; then
     echo "[tf-wrapper] ADC impersonate absent/invalide, ouverture du login navigateur..."
     gcloud auth application-default login \
       --impersonate-service-account="${IMPERSONATE_SA}"
   fi
 
-  if ! gcloud auth application-default print-access-token >/dev/null 2>&1; then
+  if ! impersonation_token_ok; then
     echo "[tf-wrapper] ADC invalide apres login pour ${IMPERSONATE_SA}." >&2
     exit 4
   fi

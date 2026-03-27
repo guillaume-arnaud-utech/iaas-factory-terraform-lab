@@ -9,6 +9,7 @@ from typing import List, Tuple
 MODULE_START_RE = re.compile(r'^(?P<indent>\s*)module\s+"(?P<name>[^"]+)"\s*\{')
 LABELS_RE = re.compile(r'^(?P<indent>\s*)labels\s*=\s*(?P<expr>.+?)\s*(#.*)?$')
 SOURCE_RE = re.compile(r'^\s*source\s*=\s*(?P<expr>.+?)\s*(#.*)?$')
+INSTANCE_BASE_NAME_RE = re.compile(r'^(?P<indent>\s*)instance_base_name\s*=\s*(?P<expr>.+?)\s*(#.*)?$')
 
 
 def brace_delta(line: str) -> int:
@@ -43,7 +44,14 @@ def choose_indent(block: List[str], fallback_indent: str) -> str:
     return fallback_indent
 
 
-def patch_file(path: str, locals_symbol: str, source_contains: str) -> bool:
+def patch_file(
+    path: str,
+    locals_symbol: str,
+    source_contains: str,
+    set_instance_base_name: bool,
+    instance_base_name: str,
+    instance_base_name_module_source_contains: str,
+) -> bool:
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
 
@@ -57,6 +65,37 @@ def patch_file(path: str, locals_symbol: str, source_contains: str) -> bool:
         block = lines[start:end]
         if not module_matches(block, source_contains):
             continue
+
+        if set_instance_base_name and module_matches(block, instance_base_name_module_source_contains):
+            instance_idx = -1
+            instance_match = None
+            for idx, line in enumerate(block):
+                m = INSTANCE_BASE_NAME_RE.match(line)
+                if m:
+                    instance_idx = idx
+                    instance_match = m
+                    break
+
+            if instance_idx >= 0 and instance_match:
+                indent = instance_match.group("indent")
+                desired_line = f'{indent}instance_base_name = "{instance_base_name}"\n'
+                if block[instance_idx] != desired_line:
+                    block[instance_idx] = desired_line
+                    lines[start:end] = block
+                    changed = True
+            else:
+                insert_at = end - 1
+                for i in range(end - 1, start, -1):
+                    if re.match(r"^\s*\}\s*$", lines[i]):
+                        insert_at = i
+                        break
+                module_indent = re.match(r"^\s*", lines[start]).group(0)
+                indent = choose_indent(block, module_indent + "  ")
+                lines[insert_at:insert_at] = [f'{indent}instance_base_name = "{instance_base_name}"\n']
+                changed = True
+
+            # Refresh local block after potential edition.
+            block = lines[start:end]
 
         labels_idx = -1
         labels_match = None
@@ -101,10 +140,15 @@ def main() -> int:
     parser.add_argument("--exclude", action="append", default=[])
     parser.add_argument("--locals-symbol", default="local.tf_wrapper_labels")
     parser.add_argument("--module-source-contains", default="tf-module-gcp-")
+    parser.add_argument("--set-instance-base-name", default="0")
+    parser.add_argument("--instance-base-name", default="")
+    parser.add_argument("--instance-base-name-module-source-contains", default="tf-module-gcp-ceins")
     args = parser.parse_args()
 
     root = os.path.abspath(args.dir)
     excluded = set(args.exclude)
+
+    set_instance_base_name = str(args.set_instance_base_name).lower() in {"1", "true", "yes"}
 
     for name in os.listdir(root):
         if not name.endswith(".tf"):
@@ -115,6 +159,9 @@ def main() -> int:
             os.path.join(root, name),
             locals_symbol=args.locals_symbol,
             source_contains=args.module_source_contains,
+            set_instance_base_name=set_instance_base_name,
+            instance_base_name=args.instance_base_name,
+            instance_base_name_module_source_contains=args.instance_base_name_module_source_contains,
         )
 
     return 0
