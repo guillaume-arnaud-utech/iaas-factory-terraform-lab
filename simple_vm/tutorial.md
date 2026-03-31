@@ -34,7 +34,7 @@ Copiez le contenu suivant dans le fichier `main.tf` :
 
 ```hcl
 module "simple_vm" {
-    source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v22.4.1"
+    source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v23.0.0"
 
     project_id         = "<walkthrough-project-id/>"
     instance_base_name = "simplevm"
@@ -80,7 +80,7 @@ terraform apply
 Une fois le déploiement terminé, vous pouvez récupérer le nom et la zone de votre instance via les commandes :
 
 ```bash
-gcloud compute instances list --filter="name:simplevm*" --project="<walkthrough-project-id/>"
+gcloud compute instances list --project="<walkthrough-project-id/>"
 ```
 
 et vous y connecter avec la commande :
