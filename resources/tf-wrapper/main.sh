@@ -8,8 +8,26 @@ LABEL_KEY="iaas-training-user"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+gcloud_config_dir() {
+  local dir
+  dir="$(gcloud info --format='value(config.paths.global_config_dir)' 2>/dev/null || true)"
+  if [[ -n "${dir}" ]]; then
+    echo "${dir}"
+    return 0
+  fi
+  if [[ -n "${CLOUDSDK_CONFIG:-}" ]]; then
+    echo "${CLOUDSDK_CONFIG}"
+    return 0
+  fi
+  echo "${HOME}/.config/gcloud"
+}
+
 terraform_bin() {
   echo "${TERRAFORM_BIN:-terraform}"
+}
+
+impersonate_sa() {
+  echo "${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-${DEFAULT_IMPERSONATE_SA}}"
 }
 
 run_terraform() {
@@ -48,11 +66,17 @@ impersonation_state_file() {
   echo "${STATE_DIR}/adc-impersonation-${sa_file}.ok"
 }
 
-impersonation_token_ok() {
+adc_impersonation_configured_for_target() {
   local impersonate_sa="$1"
-  gcloud auth application-default print-access-token \
-    --impersonate-service-account="${impersonate_sa}" \
-    >/dev/null 2>&1
+  local adc_file
+  adc_file="$(gcloud_config_dir)/application_default_credentials.json"
+  [[ -f "${adc_file}" ]] || return 1
+  grep -q '"service_account_impersonation_url"' "${adc_file}" || return 1
+  grep -q "${impersonate_sa}" "${adc_file}" || return 1
+}
+
+adc_token_ok() {
+  gcloud auth application-default print-access-token >/dev/null 2>&1
 }
 
 sanitize_label_value() {
@@ -199,29 +223,43 @@ EOF
 }
 
 check_impersonation() {
-  local impersonate_sa="${DEFAULT_IMPERSONATE_SA}"
+  local active_impersonate_sa
+  local configured_cli_impersonation_sa
   local warm_file
+
+  active_impersonate_sa="$(impersonate_sa)"
+  if [[ -z "${active_impersonate_sa}" ]]; then
+    echo "[tf-wrapper] Service account d'impersonation manquant." >&2
+    exit 2
+  fi
 
   if ! command -v gcloud >/dev/null 2>&1; then
     echo "[tf-wrapper] gcloud introuvable, verification d'impersonation impossible." >&2
     exit 3
   fi
 
-  warm_file="$(impersonation_state_file "${impersonate_sa}")"
+  # Prevent clashes between persistent gcloud CLI impersonation config
+  # and our wrapper-managed ADC impersonation flow.
+  configured_cli_impersonation_sa="$(gcloud config get-value auth/impersonate_service_account 2>/dev/null || true)"
+  if [[ -n "${configured_cli_impersonation_sa}" && "${configured_cli_impersonation_sa}" != "(unset)" ]]; then
+    gcloud config unset auth/impersonate_service_account --quiet >/dev/null 2>&1 || true
+  fi
 
-  # Fast path: already warmed for this SA and impersonation still valid.
-  if [[ -f "${warm_file}" ]] && impersonation_token_ok "${impersonate_sa}"; then
+  warm_file="$(impersonation_state_file "${active_impersonate_sa}")"
+
+  # Fast path: already warmed for this SA and ADC still valid.
+  if [[ -f "${warm_file}" ]] && adc_impersonation_configured_for_target "${active_impersonate_sa}" && adc_token_ok; then
     return 0
   fi
 
-  if ! impersonation_token_ok "${impersonate_sa}"; then
+  if ! adc_impersonation_configured_for_target "${active_impersonate_sa}" || ! adc_token_ok; then
     echo "[tf-wrapper] ADC impersonate absent/invalide, ouverture du login navigateur..."
     gcloud auth application-default login \
-      --impersonate-service-account="${impersonate_sa}"
+      --impersonate-service-account="${active_impersonate_sa}"
   fi
 
-  if ! impersonation_token_ok "${impersonate_sa}"; then
-    echo "[tf-wrapper] ADC invalide apres login pour ${impersonate_sa}." >&2
+  if ! adc_impersonation_configured_for_target "${active_impersonate_sa}" || ! adc_token_ok; then
+    echo "[tf-wrapper] ADC invalide apres login pour ${active_impersonate_sa}." >&2
     exit 4
   fi
 
@@ -230,7 +268,10 @@ check_impersonation() {
 
 main() {
   local terraform_subcmd="${1:-}"
+  local active_impersonate_sa
 
+  active_impersonate_sa="$(impersonate_sa)"
+  export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT="${active_impersonate_sa}"
   check_impersonation
   inject_labels_if_needed "${terraform_subcmd}"
   if [[ "${terraform_subcmd}" == "init" ]]; then
