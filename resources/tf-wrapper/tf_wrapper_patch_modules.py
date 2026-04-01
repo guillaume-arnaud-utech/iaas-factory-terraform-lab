@@ -149,7 +149,6 @@ def main() -> int:
     excluded = set(args.exclude)
 
     set_instance_base_name = str(args.set_instance_base_name).lower() in {"1", "true", "yes"}
-
     for name in os.listdir(root):
         if not name.endswith(".tf"):
             continue

@@ -22,7 +22,13 @@ Vous allez écrire le code qui appelle le module pour créer une VM simple.
 
 ```bash
 mkdir -p ./simple-vm
+```
+
+```bash
 cd ./simple-vm
+```
+
+```bash
 touch main.tf
 ```
 
@@ -34,11 +40,11 @@ Copiez le contenu suivant dans le fichier `main.tf` :
 
 ```hcl
 module "simple_vm" {
-    source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v23.0.0"
+    source = "github.com/ugieiris/tf-module-gcp-ceins?ref=v22.4.0"
 
     project_id         = "<walkthrough-project-id/>"
     instance_base_name = "simplevm"
-    instance_type      = "n4-highcpu-2"
+    instance_type      = "n2-custom-2-4096"
     description        = "Simple VM"
     instance_profile   = "test"
     os_image_family    = "iaas-rhel-9"
@@ -57,6 +63,38 @@ Initialisez Terraform pour télécharger les modules et les providers nécessair
 terraform init
 ```
 
+Lors du premier `terraform init`, un wrapper (`tf-wrapper`) va déclencher une authentification Google via navigateur.
+Ce comportement est normal : il permet de générer des credentials valides pour poursuivre l'initialisation Terraform.
+
+Regardez bien le terminal : un message d'authentification et une URL de connexion vont apparaître.
+
+### Ce que vous allez voir dans le terminal
+
+```text
+[tf-wrapper] ADC impersonate absent/invalide, ouverture du login navigateur...
+...
+Do you want to continue (Y/n)?
+```
+
+Appuyez sur `Entrée` (ou `Y`) pour continuer.
+
+Terraform affiche ensuite une URL Google à ouvrir dans le navigateur.
+
+### Parcours d'authentification Google (navigateur)
+
+1. Ouvrez l'URL affichée dans le terminal.
+2. Sélectionnez votre compte Google.
+3. Autorisez l'accès demandé par **Google Auth Library**.
+4. Cliquez sur **Copy** pour copier le code d'authentification.
+
+### Retour dans le terminal
+
+Collez le code dans le terminal initial (`Ctrl + V`) puis validez avec `Entrée`.
+
+L'exécution reprend immédiatement et `terraform init` se termine normalement.
+
+> Cette étape est généralement nécessaire uniquement la première fois (ou après expiration/invalidité des credentials locaux).
+
 ## Planification du déploiement
 
 Vérifiez les ressources qui seront créées. Cette étape permet de valider la configuration avant d'appliquer les changements :
@@ -65,7 +103,7 @@ Vérifiez les ressources qui seront créées. Cette étape permet de valider la 
 terraform plan
 ```
 
-<walkthrough-spotlight-pointer target="console-output">Vérifiez la sortie pour voir les ressources à créer (Plan: X to add)</walkthrough-spotlight-pointer>
+Vérifiez la sortie pour voir les ressources à créer (`Plan: X to add`).
 
 ## Création des ressources
 

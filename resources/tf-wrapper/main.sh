@@ -2,9 +2,14 @@
 set -euo pipefail
 
 STATE_PREFIX_BASE="SANDBOX/users"
-DEFAULT_IMPERSONATE_SA="sa-tf-app-gcp-iaastraining-s@iaastraining-s-0dwp.iam.gserviceaccount.com"
+DEFAULT_IMPERSONATE_SA="sa-terraform-lab@iaastraining-s-0dwp.iam.gserviceaccount.com"
 STATE_DIR="${HOME}/.tf-wrapper"
 LABEL_KEY="iaas-training-user"
+WRAPPER_VERSION="2026-03-31-audit-v1"
+AUDIT_ENABLED="${TF_WRAPPER_AUDIT_ENABLED:-1}"
+AUDIT_PROJECT_ID="${TF_WRAPPER_AUDIT_PROJECT_ID:-iaastraining-s-0dwp}"
+AUDIT_TOPIC="${TF_WRAPPER_AUDIT_TOPIC:-terraform-lab-events}"
+AUDIT_MAX_RESOURCES="${TF_WRAPPER_AUDIT_MAX_RESOURCES:-100}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -22,6 +27,10 @@ gcloud_config_dir() {
   echo "${HOME}/.config/gcloud"
 }
 
+active_adc_file() {
+  echo "$(gcloud_config_dir)/application_default_credentials.json"
+}
+
 terraform_bin() {
   echo "${TERRAFORM_BIN:-terraform}"
 }
@@ -34,6 +43,12 @@ run_terraform() {
   local tf_bin
   tf_bin="$(terraform_bin)"
   exec "${tf_bin}" "$@"
+}
+
+run_terraform_no_exec() {
+  local tf_bin
+  tf_bin="$(terraform_bin)"
+  "${tf_bin}" "$@"
 }
 
 has_arg() {
@@ -69,7 +84,7 @@ impersonation_state_file() {
 adc_impersonation_configured_for_target() {
   local impersonate_sa="$1"
   local adc_file
-  adc_file="$(gcloud_config_dir)/application_default_credentials.json"
+  adc_file="$(active_adc_file)"
   [[ -f "${adc_file}" ]] || return 1
   grep -q '"service_account_impersonation_url"' "${adc_file}" || return 1
   grep -q "${impersonate_sa}" "${adc_file}" || return 1
@@ -123,6 +138,194 @@ build_remote_state_prefix() {
   user_label="$(sanitize_label_value "${user_email}")"
   lab_label="$(sanitize_label_value "${lab_id}")"
   echo "${STATE_PREFIX_BASE}/${user_label}/${lab_label}"
+}
+
+collect_state_resources_json() {
+  local tf_bin
+  local max_resources
+  local state_json_file
+  local parsed_json
+
+  tf_bin="$(terraform_bin)"
+  max_resources="${AUDIT_MAX_RESOURCES}"
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "[]"
+    return 0
+  fi
+
+  state_json_file="$(mktemp)"
+  if ! "${tf_bin}" show -json >"${state_json_file}" 2>/dev/null; then
+    rm -f "${state_json_file}"
+    echo "[]"
+    return 0
+  fi
+
+  if ! parsed_json="$(MAX_RESOURCES="${max_resources}" STATE_JSON_FILE="${state_json_file}" python3 - <<'PY'
+import json
+import os
+
+max_resources = int(os.environ.get("MAX_RESOURCES", "100"))
+state_json_file = os.environ.get("STATE_JSON_FILE", "")
+if not state_json_file:
+    print("[]")
+    raise SystemExit(0)
+
+try:
+    with open(state_json_file, "r", encoding="utf-8") as f:
+        raw = f.read().strip()
+    if not raw:
+        print("[]")
+        raise SystemExit(0)
+    data = json.loads(raw)
+except Exception:
+    print("[]")
+    raise SystemExit(0)
+
+root = data.get("values", {}).get("root_module", {})
+items = []
+
+def simplify_values(values):
+    keys = ["name", "project", "region", "zone", "address", "machine_type", "service_account", "labels"]
+    out = {}
+    for key in keys:
+        if key in values and values.get(key) is not None:
+            out[key] = values.get(key)
+    return out
+
+def walk(module):
+    for r in module.get("resources", []):
+        values = r.get("values", {}) if isinstance(r.get("values", {}), dict) else {}
+        items.append({
+            "address": r.get("address"),
+            "type": r.get("type"),
+            "name": r.get("name"),
+            "mode": r.get("mode"),
+            "values": simplify_values(values),
+        })
+    for child in module.get("child_modules", []):
+        walk(child)
+
+if isinstance(root, dict):
+    walk(root)
+
+print(json.dumps(items[:max_resources], ensure_ascii=False))
+PY
+  )"; then
+    rm -f "${state_json_file}"
+    echo "[]"
+    return 0
+  fi
+
+  rm -f "${state_json_file}"
+  echo "${parsed_json}"
+}
+
+emit_audit_event() {
+  local action="$1"
+  local status="$2"
+  local resources_json="$3"
+  local lab_id="$4"
+  local user_email="$5"
+  local state_prefix="$6"
+  local active_impersonate_sa="$7"
+  local event_timestamp
+  local event_id
+  local resources_count
+  local payload
+
+  if [[ "${AUDIT_ENABLED}" == "0" || "${AUDIT_ENABLED}" == "false" ]]; then
+    return 0
+  fi
+
+  if ! command -v gcloud >/dev/null 2>&1; then
+    return 0
+  fi
+
+  event_timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  event_id="$(python3 - <<'PY'
+import uuid
+print(uuid.uuid4())
+PY
+)"
+  resources_count="$(RESOURCES_JSON="${resources_json}" python3 - <<'PY'
+import json
+import os
+raw = os.environ.get("RESOURCES_JSON", "[]")
+try:
+    data = json.loads(raw)
+    print(len(data) if isinstance(data, list) else 0)
+except Exception:
+    print(0)
+PY
+)"
+
+  payload="$(EVENT_ID="${event_id}" EVENT_TIMESTAMP="${event_timestamp}" LAB_ID="${lab_id}" USER_EMAIL="${user_email}" ACTION="${action}" STATUS="${status}" PROJECT_ID="${AUDIT_PROJECT_ID}" STATE_PREFIX="${state_prefix}" RESOURCES_COUNT="${resources_count}" RESOURCES_JSON="${resources_json}" WRAPPER_VERSION="${WRAPPER_VERSION}" python3 - <<'PY'
+import json
+import os
+
+payload = {
+    "event_id": os.environ["EVENT_ID"],
+    "event_timestamp": os.environ["EVENT_TIMESTAMP"],
+    "lab_name": os.environ["LAB_ID"],
+    "user_email": os.environ.get("USER_EMAIL", ""),
+    "action": os.environ["ACTION"],
+    "status": os.environ["STATUS"],
+    "project_id": os.environ["PROJECT_ID"],
+    "state_prefix": os.environ.get("STATE_PREFIX", ""),
+    "resources_count": int(os.environ.get("RESOURCES_COUNT", "0")),
+    "resources_json": os.environ.get("RESOURCES_JSON", "[]"),
+    "wrapper_version": os.environ.get("WRAPPER_VERSION", ""),
+}
+print(json.dumps(payload, ensure_ascii=False))
+PY
+)"
+
+  gcloud pubsub topics publish "${AUDIT_TOPIC}" \
+    --project="${AUDIT_PROJECT_ID}" \
+    --message="${payload}" \
+    --impersonate-service-account="${active_impersonate_sa}" \
+    >/dev/null 2>&1 || true
+}
+
+run_terraform_with_audit() {
+  local action="$1"
+  shift
+  local active_impersonate_sa="$1"
+  shift
+
+  local lab_id
+  local user_email
+  local state_prefix
+  local resources_before="[]"
+  local resources_after="[]"
+  local status="error"
+  local rc=1
+
+  lab_id="$(basename "${PWD}")"
+  user_email="$(discover_user_email || true)"
+  state_prefix="$(build_remote_state_prefix "${lab_id}")"
+
+  if [[ "${action}" == "destroy" ]]; then
+    resources_before="$(collect_state_resources_json)"
+  fi
+
+  if run_terraform_no_exec "$@"; then
+    rc=0
+    status="success"
+  fi
+
+  if [[ "${action}" == "apply" && "${rc}" -eq 0 ]]; then
+    resources_after="$(collect_state_resources_json)"
+  fi
+
+  if [[ "${action}" == "destroy" ]]; then
+    emit_audit_event "${action}" "${status}" "${resources_before}" "${lab_id}" "${user_email}" "${state_prefix}" "${active_impersonate_sa}"
+  else
+    emit_audit_event "${action}" "${status}" "${resources_after}" "${lab_id}" "${user_email}" "${state_prefix}" "${active_impersonate_sa}"
+  fi
+
+  return "${rc}"
 }
 
 should_patch_for_command() {
@@ -226,6 +429,7 @@ check_impersonation() {
   local active_impersonate_sa
   local configured_cli_impersonation_sa
   local warm_file
+  local adc_file
 
   active_impersonate_sa="$(impersonate_sa)"
   if [[ -z "${active_impersonate_sa}" ]]; then
@@ -246,6 +450,7 @@ check_impersonation() {
   fi
 
   warm_file="$(impersonation_state_file "${active_impersonate_sa}")"
+  adc_file="$(active_adc_file)"
 
   # Fast path: already warmed for this SA and ADC still valid.
   if [[ -f "${warm_file}" ]] && adc_impersonation_configured_for_target "${active_impersonate_sa}" && adc_token_ok; then
@@ -263,19 +468,28 @@ check_impersonation() {
     exit 4
   fi
 
+  # Ensure Terraform uses the same ADC file as gcloud in Cloud Shell.
+  if [[ -f "${adc_file}" ]]; then
+    export GOOGLE_APPLICATION_CREDENTIALS="${adc_file}"
+  fi
+
   touch "${warm_file}"
 }
 
 main() {
   local terraform_subcmd="${1:-}"
   local active_impersonate_sa
-
   active_impersonate_sa="$(impersonate_sa)"
-  export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT="${active_impersonate_sa}"
+  # Keep Terraform on explicit ADC credentials to avoid metadata fallback.
+  unset GOOGLE_IMPERSONATE_SERVICE_ACCOUNT || true
   check_impersonation
   inject_labels_if_needed "${terraform_subcmd}"
   if [[ "${terraform_subcmd}" == "init" ]]; then
     run_init_with_remote_state "$@"
+  fi
+  if [[ "${terraform_subcmd}" == "apply" || "${terraform_subcmd}" == "destroy" ]]; then
+    run_terraform_with_audit "${terraform_subcmd}" "${active_impersonate_sa}" "$@"
+    exit $?
   fi
   run_terraform "$@"
 }
