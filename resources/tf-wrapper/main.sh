@@ -2,7 +2,6 @@
 set -euo pipefail
 
 STATE_PREFIX_BASE="SANDBOX/users"
-DEFAULT_IMPERSONATE_SA="sa-terraform-lab@iaastraining-s-0dwp.iam.gserviceaccount.com"
 STATE_DIR="${HOME}/.tf-wrapper"
 LABEL_KEY="iaas-training-user"
 WRAPPER_VERSION="2026-03-31-audit-v1"
@@ -36,7 +35,7 @@ terraform_bin() {
 }
 
 impersonate_sa() {
-  echo "${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-${DEFAULT_IMPERSONATE_SA}}"
+  echo "${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-}"
 }
 
 run_terraform() {

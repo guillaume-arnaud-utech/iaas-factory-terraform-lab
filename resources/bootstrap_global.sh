@@ -6,15 +6,47 @@ WRAPPER_PATH="${REPO_DIR}/resources/tf-wrapper/terraform"
 
 SECRET_PROJECT="${LAB_BOOTSTRAP_SECRET_PROJECT:-iaastraining-s-0dwp}"
 SECRET_NAME="${LAB_BOOTSTRAP_SECRET_NAME:-github-terraform-lab}"
+IMPERSONATE_SA_SECRET_NAME="${LAB_BOOTSTRAP_IMPERSONATE_SA_SECRET_NAME:-terraform-lab-impersonate-sa}"
 SSH_KEY_PATH="${LAB_BOOTSTRAP_SSH_KEY_PATH:-${HOME}/.ssh/github-terraform-lab}"
 GITHUB_HOST_ALIAS="${LAB_BOOTSTRAP_GITHUB_HOST_ALIAS:-github.com}"
 TERRAFORM_VERSION="${LAB_BOOTSTRAP_TERRAFORM_VERSION:-1.13.2}"
 TERRAFORM_BIN_DIR="${LAB_BOOTSTRAP_TERRAFORM_BIN_DIR:-${HOME}/.local/bin}"
 TERRAFORM_VERSIONED_BIN="${TERRAFORM_BIN_DIR}/terraform-${TERRAFORM_VERSION}"
-TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-sa-terraform-lab@iaastraining-s-0dwp.iam.gserviceaccount.com}"
+TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT="${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT:-}"
 TF_WRAPPER_GCS_STATE_BUCKET="${TF_WRAPPER_GCS_STATE_BUCKET:-iaastraining-s-bkt-tf_app_gcp_tfstate}"
 TF_WRAPPER_GCS_STATE_PREFIX_BASE="${TF_WRAPPER_GCS_STATE_PREFIX_BASE:-SANDBOX/users}"
 TF_WRAPPER_ENABLE_REMOTE_STATE="${TF_WRAPPER_ENABLE_REMOTE_STATE:-1}"
+
+ensure_impersonate_sa() {
+  local fetched_sa
+
+  if [[ -n "${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT}" ]]; then
+    return 0
+  fi
+
+  if ! command -v gcloud >/dev/null 2>&1; then
+    echo "[bootstrap] gcloud introuvable, impossible de recuperer la SA d'impersonation." >&2
+    return 1
+  fi
+
+  echo "[bootstrap] Recuperation de la SA d'impersonation depuis Secret Manager..."
+  fetched_sa="$(gcloud secrets versions access latest \
+    --secret="${IMPERSONATE_SA_SECRET_NAME}" \
+    --project="${SECRET_PROJECT}" \
+    2>/dev/null | tr -d '\r\n' || true)"
+
+  if [[ -z "${fetched_sa}" ]]; then
+    echo "[bootstrap] Secret SA vide/inaccessible: ${SECRET_PROJECT}/${IMPERSONATE_SA_SECRET_NAME}" >&2
+    return 1
+  fi
+
+  if [[ "${fetched_sa}" != *"@"*".iam.gserviceaccount.com" ]]; then
+    echo "[bootstrap] Valeur de secret invalide pour la SA: ${fetched_sa}" >&2
+    return 1
+  fi
+
+  TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT="${fetched_sa}"
+}
 
 ensure_ssh_key() {
   mkdir -p "${HOME}/.ssh"
@@ -71,6 +103,18 @@ ensure_shell_path_defaults() {
   local state_prefix_line="export TF_WRAPPER_GCS_STATE_PREFIX_BASE=\"${TF_WRAPPER_GCS_STATE_PREFIX_BASE}\""
   local enable_remote_state_line="export TF_WRAPPER_ENABLE_REMOTE_STATE=\"${TF_WRAPPER_ENABLE_REMOTE_STATE}\""
   local rc_file
+  replace_or_append_export_line() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+    local new_line="export ${key}=\"${value}\""
+
+    if rg -n "^export ${key}=" "${file}" >/dev/null 2>&1; then
+      sed -i -E "s|^export ${key}=.*$|${new_line}|" "${file}"
+    else
+      echo "${new_line}" >> "${file}"
+    fi
+  }
 
   for rc_file in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
     touch "${rc_file}"
@@ -91,21 +135,11 @@ EOF
     if ! grep -qF "${path_line}" "${rc_file}"; then
       echo "${path_line}" >> "${rc_file}"
     fi
-    if ! grep -qF "${tf_bin_line}" "${rc_file}"; then
-      echo "${tf_bin_line}" >> "${rc_file}"
-    fi
-    if ! grep -qF "${impersonate_line}" "${rc_file}"; then
-      echo "${impersonate_line}" >> "${rc_file}"
-    fi
-    if ! grep -qF "${enable_remote_state_line}" "${rc_file}"; then
-      echo "${enable_remote_state_line}" >> "${rc_file}"
-    fi
-    if ! grep -qF "${state_prefix_line}" "${rc_file}"; then
-      echo "${state_prefix_line}" >> "${rc_file}"
-    fi
-    if ! grep -qF "${state_bucket_line}" "${rc_file}"; then
-      echo "${state_bucket_line}" >> "${rc_file}"
-    fi
+    replace_or_append_export_line "${rc_file}" "TF_WRAPPER_REAL_TERRAFORM_BIN" "\${HOME}/.local/bin/terraform-${TERRAFORM_VERSION}"
+    replace_or_append_export_line "${rc_file}" "TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT" "${TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT}"
+    replace_or_append_export_line "${rc_file}" "TF_WRAPPER_ENABLE_REMOTE_STATE" "${TF_WRAPPER_ENABLE_REMOTE_STATE}"
+    replace_or_append_export_line "${rc_file}" "TF_WRAPPER_GCS_STATE_PREFIX_BASE" "${TF_WRAPPER_GCS_STATE_PREFIX_BASE}"
+    replace_or_append_export_line "${rc_file}" "TF_WRAPPER_GCS_STATE_BUCKET" "${TF_WRAPPER_GCS_STATE_BUCKET}"
   done
 }
 
@@ -150,6 +184,7 @@ ensure_terraform_wrapper() {
 }
 
 main() {
+  ensure_impersonate_sa
   ensure_ssh_key
   ensure_ssh_config
   ensure_git_https_rewrite
