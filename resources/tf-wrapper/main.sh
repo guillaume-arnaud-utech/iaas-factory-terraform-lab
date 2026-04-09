@@ -30,6 +30,13 @@ active_adc_file() {
   echo "$(gcloud_config_dir)/application_default_credentials.json"
 }
 
+export_google_application_credentials_if_present() {
+  local adc_file="$1"
+  if [[ -f "${adc_file}" ]]; then
+    export GOOGLE_APPLICATION_CREDENTIALS="${adc_file}"
+  fi
+}
+
 terraform_bin() {
   echo "${TERRAFORM_BIN:-terraform}"
 }
@@ -453,6 +460,7 @@ check_impersonation() {
 
   # Fast path: already warmed for this SA and ADC still valid.
   if [[ -f "${warm_file}" ]] && adc_impersonation_configured_for_target "${active_impersonate_sa}" && adc_token_ok; then
+    export_google_application_credentials_if_present "${adc_file}"
     return 0
   fi
 
@@ -467,10 +475,7 @@ check_impersonation() {
     exit 4
   fi
 
-  # Ensure Terraform uses the same ADC file as gcloud in Cloud Shell.
-  if [[ -f "${adc_file}" ]]; then
-    export GOOGLE_APPLICATION_CREDENTIALS="${adc_file}"
-  fi
+  export_google_application_credentials_if_present "${adc_file}"
 
   touch "${warm_file}"
 }
