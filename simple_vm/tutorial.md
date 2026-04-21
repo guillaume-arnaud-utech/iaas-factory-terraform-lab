@@ -11,7 +11,7 @@ A l'aide du module Terraform CEINS, vous allez créer une instance GCE simple, p
 Avant de commencer, il est nécessaire d'éxecuter le script `bootstrap.sh` pour le bon déroulement de ce lab :
 
 ```bash
-/bin/bash bootstrap.sh
+source ./bootstrap.sh
 ```
 
 ## Utilisation du module Terraform CEINS
