@@ -7,8 +7,7 @@ WRAPPER_PATH="${REPO_DIR}/resources/tf-wrapper/terraform"
 SECRET_PROJECT="${LAB_BOOTSTRAP_SECRET_PROJECT:-iaastraining-s-0dwp}"
 SECRET_NAME="${LAB_BOOTSTRAP_SECRET_NAME:-github-terraform-lab}"
 IMPERSONATE_SA_SECRET_NAME="${LAB_BOOTSTRAP_IMPERSONATE_SA_SECRET_NAME:-terraform-lab-impersonate-sa}"
-SSH_KEY_PATH="${LAB_BOOTSTRAP_SSH_KEY_PATH:-${HOME}/.ssh/github-terraform-lab}"
-GITHUB_HOST_ALIAS="${LAB_BOOTSTRAP_GITHUB_HOST_ALIAS:-github.com}"
+GITHUB_CREDENTIAL_HELPER="${LAB_BOOTSTRAP_GITHUB_CREDENTIAL_HELPER:-${HOME}/.local/bin/git-credential-gcloud-github}"
 TERRAFORM_VERSION="${LAB_BOOTSTRAP_TERRAFORM_VERSION:-1.13.2}"
 TERRAFORM_BIN_DIR="${LAB_BOOTSTRAP_TERRAFORM_BIN_DIR:-${HOME}/.local/bin}"
 TERRAFORM_VERSIONED_BIN="${TERRAFORM_BIN_DIR}/terraform-${TERRAFORM_VERSION}"
@@ -48,50 +47,25 @@ ensure_impersonate_sa() {
   TF_WRAPPER_IMPERSONATE_SERVICE_ACCOUNT="${fetched_sa}"
 }
 
-ensure_ssh_key() {
-  mkdir -p "${HOME}/.ssh"
+ensure_github_credential_helper() {
+  mkdir -p "$(dirname "${GITHUB_CREDENTIAL_HELPER}")"
 
-  if [[ -s "${SSH_KEY_PATH}" ]]; then
-    echo "[bootstrap] Cle SSH deja presente: ${SSH_KEY_PATH}"
-    return 0
-  fi
-
-  if ! command -v gcloud >/dev/null 2>&1; then
-    echo "[bootstrap] gcloud introuvable, impossible de recuperer la cle SSH." >&2
-    return 1
-  fi
-
-  echo "[bootstrap] Recuperation de la cle SSH depuis Secret Manager..."
-  gcloud secrets versions access latest \
+  cat > "${GITHUB_CREDENTIAL_HELPER}" <<EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "get" ]]; then
+  token="\$(gcloud secrets versions access latest \
     --secret="${SECRET_NAME}" \
     --project="${SECRET_PROJECT}" \
-    > "${SSH_KEY_PATH}"
-
-  chmod 600 "${SSH_KEY_PATH}"
-}
-
-ensure_ssh_config() {
-  local marker="# iaas-factory-terraform-lab"
-  local config_file="${HOME}/.ssh/config"
-
-  touch "${config_file}"
-  chmod 600 "${config_file}"
-
-  if grep -qF "${marker}" "${config_file}"; then
-    echo "[bootstrap] Configuration SSH deja en place."
-    return 0
-  fi
-
-  cat >> "${config_file}" <<EOF
-${marker}
-Host ${GITHUB_HOST_ALIAS}
-  IdentityFile ${SSH_KEY_PATH}
-  StrictHostKeyChecking no
+    2>/dev/null | tr -d '\r\n')"
+  printf 'protocol=https\nhost=github.com\nusername=x-token\npassword=%s\n' "\${token}"
+fi
 EOF
+  chmod 700 "${GITHUB_CREDENTIAL_HELPER}"
+  echo "[bootstrap] Credential helper installe: ${GITHUB_CREDENTIAL_HELPER}"
 }
 
-ensure_git_https_rewrite() {
-  git config --global url."git@github.com:".insteadOf "https://github.com/"
+ensure_git_credentials() {
+  git config --global credential.https://github.com.helper "${GITHUB_CREDENTIAL_HELPER}"
 }
 
 ensure_shell_path_defaults() {
@@ -185,9 +159,8 @@ ensure_terraform_wrapper() {
 
 main() {
   ensure_impersonate_sa
-  ensure_ssh_key
-  ensure_ssh_config
-  ensure_git_https_rewrite
+  ensure_github_credential_helper
+  ensure_git_credentials
   ensure_shell_path_defaults
   ensure_terraform_version
   ensure_terraform_wrapper
